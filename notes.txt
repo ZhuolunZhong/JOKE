@@ -1,0 +1,10 @@
+You need python version 3.9
+You need install these packages:
+mysql-connector-python
+openai
+langchain
+streamlit
+pandas
+
+open terminal under the enviornment and type:
+streamlit run stream.py
