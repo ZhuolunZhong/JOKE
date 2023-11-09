@@ -1,10 +1,10 @@
 import streamlit as st
 import random
-from langchain.chains import LLMChain
+from langchain.chains import LLMChain, ConversationChain
 from langchain.prompts import PromptTemplate
 from langchain.memory import ConversationBufferMemory
 from langchain.memory.chat_message_histories import StreamlitChatMessageHistory
-from langchain import OpenAI, ConversationChain
+from langchain.llms import OpenAI
 from langchain.chat_models import ChatOpenAI
 import mysql.connector
 from mysql.connector import Error
@@ -81,7 +81,7 @@ with col2:
                 input_variables=["suggestion"],
                 template="The user wants some more advice. One way of making a cartoon funnier is to {suggestion} With that in mind, please talk directly to the user to suggest ways the user can adapt their ideas to create a funnier caption. Respond in no more than three sentences.")
             #llm_chain = LLMChain(llm=OpenAI(openai_api_key=st.session_state.API, model='gpt-3.5-turbo'), prompt=prompt, memory=memory)
-            llm_chain = LLMChain(llm=ChatOpenAI(openai_api_key=st.session_state.API, model='gpt-4'), prompt=prompt, memory=memory)
+            llm_chain = LLMChain(llm=ChatOpenAI(openai_api_key=st.session_state.API, model=model_selection), prompt=prompt, memory=memory)
 
             with st.form(key='my_form2'):
                 description_location = st.text_area('Please describe the content of the cartoon in as much detail as possible:', height = 2)
@@ -90,7 +90,17 @@ with col2:
                 caption_1 = st.text_input('Write your caption:')
                 submit_button_caption = st.form_submit_button(label='Submit the caption')
             with st.form(key="my_form4"):
-                option_help = st.selectbox('Choose a kind of help to ask GPT', ('use more specific language', 'make reference to all important elements of the image', 'use langauge with more than one interpretation','avoid making the joke too obvious'))
+                option_help = st.selectbox('Choose a kind of help to ask GPT', ('use more specific language',\
+                'make reference to all important elements of the image',\
+                'use langauge with more than one interpretation',\
+                'avoid making the joke too obvious',\
+                'put the punchline at the end',\
+                'introduce a tension that is resolved by the joke',\
+                'imagine it comes from the script of a Seinfeld episode',\
+                'make reference to unusual elemts of the image',\
+                'think of what the characters in the image are doing and why'\
+                'think of how the image differs from a more common situation and why'\
+                'think of the emotions the characters are feeling and why'))
                 help_button = st.form_submit_button(label='Get help')
             if st.button('Reset chat'):
                 del st.session_state.langchain_messages

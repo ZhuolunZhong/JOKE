@@ -40,12 +40,47 @@ def select(q):
             connection.close()
     return None
 
+#Set some variable for use below
+prompt_strategies = [
+   'use more specific language',
+   'make reference to all important elements of the image',
+   'use langauge with more than one interpretation',
+   'avoid making the joke too obvious',
+   'put the punchline at the end',
+   'introduce a tension that is resolved by the joke',
+   'imagine it comes from the script of a Seinfeld episode',
+   'make reference to unusual elemts of the image',
+   'think of what the characters in the image are doing and why'
+   'think of how the image differs from a more common situation and why'
+   'think of the emotions the characters are feeling and why'
+   ]
+
+#Number of strategies
+n_strat = len(prompt_strategies)
+
+#Queries sent so far
+n_query = 0
+
+#Initialize strings for prompt arguments
+current_description = 'None provided.'
+current_strategy = 'think harder.'
+recent_captions = 'None.'
+
+
+
+
+
 col1, col2 = st.columns(2)
 with col1:
-    form = st.form("my_form")
-    GPT_API = form.text_input('Your GPT API key:', key="API", type="password")
-    form.form_submit_button("Submit")
-    model_selection = st.selectbox('Choose an AI', ('gpt-3', 'gpt-3.5-turbo', 'gpt-4'))
+    #Box to enter and submit API key
+    apiform = st.form("api_form")
+    GPT_API = apiform.text_input('Your GPT API key:', key="API", type="password")
+    apiform.form_submit_button("Submit")
+    
+    #Drop-down box to select which model:
+    model_selection = st.selectbox('Choose an AI', ('gpt-3.5-turbo', 'gpt-4'))
+    
+    #Drop-down box to choose app function:
     option_function = st.selectbox('Choose a function', ('Inspiration', 'Get Help from GPT', 'Funniness prediction','topic model graph'))
 
 with col2:
@@ -63,62 +98,98 @@ with col2:
         if not st.session_state.API:
             st.title(':red[You need to enter the API!]')
         else:
-            msgs = StreamlitChatMessageHistory(key="langchain_messages")
-            memory = ConversationBufferMemory(chat_memory=msgs)
             template = """You are an AI chatbot having a conversation with a human.
 
             {history}
             Human: {human_input}
             AI: """
             prompt = PromptTemplate(input_variables=["history", "human_input"], template=template)
-            prompt_remember = PromptTemplate(
-                input_variables=["description"],
-                template="You are assisting someone trying to think of funny captions for a New York cartoon. Please remember this scene as the description of a cartoon: {description}")
-            prompt_caption = PromptTemplate(
-                input_variables=["caption"],
-                template="Please remember this caption for the cartoon: {caption}")
-            prompt_suggestion = PromptTemplate(
-                input_variables=["suggestion"],
-                template="The user wants some more advice. One way of making a cartoon funnier is to {suggestion} With that in mind, please talk directly to the user to suggest ways the user can adapt their ideas to create a funnier caption. Respond in no more than three sentences.")
-            #llm_chain = LLMChain(llm=OpenAI(openai_api_key=st.session_state.API, model='gpt-3.5-turbo'), prompt=prompt, memory=memory)
-            llm_chain = LLMChain(llm=ChatOpenAI(openai_api_key=st.session_state.API, model='gpt-4'), prompt=prompt, memory=memory)
+            msgs = StreamlitChatMessageHistory(key="langchain_messages")
+            memory = ConversationBufferMemory(chat_memory=msgs)
+            
+            #Template for initial prompt:
+            template_initial = '''
+            You are assisting someone trying to think of funny captions for a New Yorker cartoon. Here is a description of the cartoon image:
+            
+            {description}
 
-            with st.form(key='my_form2'):
+            So far the user has come up with the following captions:
+            
+            {captions}
+            
+            Your job is to help the user come up with better captions.
+            
+            One way of making a caption funnier is to {strategy}.
+            
+            With this in mind, please talk directly to the user to suggest ways the user can adapt their ideas to create a funnier caption. 
+            Respond in no more than three sentences, and avoid repeating any previous advice.
+            '''
+            #Template for subsequent prompts:
+            template_more = """
+            {history}
+            
+            From your prior advice, the user added the following captions:
+            
+            {captions}
+            
+            Now the user would like some more advice.
+            
+            Another way of making a caption funnier is to {strategy}
+            
+            With this in mind, please talk directly to the user to suggest new ways the user can adapt their ideas to create a funnier caption. 
+            Respond in no more than three sentences, and avoid repeating any previous advice.
+            """
+            
+            #Prompt for initial request for advice:
+            prompt_initial = PromptTemplate(input_variables=['description', 'captions', 'strategy'], template=template_initial)
+
+            #Prompt for subsequent requests
+            prompt_next = PromptTemplate(input_variables = ['history', 'captions', 'strategy'], template = template_more)
+            #Define the model:
+            llm_chain = LLMChain(llm=ChatOpenAI(openai_api_key=st.session_state.API, model=model_selection), prompt=prompt, memory=memory)
+
+            with st.form(key='description_form'):
                 description_location = st.text_area('Please describe the content of the cartoon in as much detail as possible:', height = 2)
-                submit_button_description = st.form_submit_button(label='Submit the description of the cartoon')
-            with st.form(key='my_form3'):
-                caption_1 = st.text_input('Write your caption:')
-                submit_button_caption = st.form_submit_button(label='Submit the caption')
-            with st.form(key="my_form4"):
-                option_help = st.selectbox('Choose a kind of help to ask GPT', ('use more specific language',\
-                'make reference to all important elements of the image',\
-                'use langauge with more than one interpretation',\
-                'avoid making the joke too obvious',\
-                'put the punchline at the end',\
-                'introduce a tension that is resolved by the joke',\
-                'imagine it comes from the script of a Seinfeld episode',\
-                'make reference to unusual elemts of the image',\
-                'think of what the characters in the image are doing and why'\
-                'think of how the image differs from a more common situation and why'\
-                'think of the emotions the characters are feeling and why'))
-                help_button = st.form_submit_button(label='Get help')
+                submit_button_description = st.form_submit_button(label='Record the description of the cartoon')
+            
+            with st.form(key='caption_form'):
+                caption_1 = st.text_input('Write a caption:')
+                submit_button_caption = st.form_submit_button(label='Record the caption')
+                
+            if submit_button_caption:
+                st.session_state.caption.append(caption_1)
+                
+            if submit_button_description:
+                current_description = description_location
+                
+            if st.button('Ask for assistance', key = 'help_button'):
+                if n_query==0: #If it is the very first request
+                    current_strategy = random.choice(prompt_strategies) #Pick a strategy at random
+                    current_captions = st.session_state.caption
+                    #Construct the prompt using initial template:
+                    prompt = prompt_initial.format(description = current_description,\
+                        captions = current_captions, strategy=current_strategy)
+                    
+                    n_query = n_query + 1 #Increment query count
+                    st.session_state.caption = [] #Clear list of recent captions
+                #If it is not the first request:
+                else:
+                    #Set history for prompt:
+                    current_history=StreamlitChatMessageHistory(key="langchain_messages")
+                    current_strategy = random.choice(strategies) #Pick one at random
+                    #Construct new prompt using next template:
+                    prompt = prompt_next.format(history = current_history,\
+                        captions = st.session_state.caption, strategy=current_strategy)
+                #Submit prompt to model and record response:
+                response = llm_chain.run(prompt)
+                #Display response in box
+                st.chat_message("ai").write(response)
+                
             if st.button('Reset chat'):
                 del st.session_state.langchain_messages
                 msgs = StreamlitChatMessageHistory(key="langchain_messages")
 
-            if submit_button_caption:
-                st.session_state.caption.append(caption_1)
-                prompt = prompt_caption.format(caption=caption_1)
-                response = llm_chain.run(prompt)
-                st.chat_message("ai").write(response)
-            if submit_button_description:
-                prompt = prompt_remember.format(description=description_location)
-                response = llm_chain.run(prompt)
-                st.chat_message("ai").write(response)
-            if help_button:
-                prompt = prompt_suggestion.format(suggestion=option_help)
-                response = llm_chain.run(prompt)
-                st.chat_message("ai").write(response)
+
 
     if option_function =='Funniness prediction':
         st.title('Wait for further development!')
